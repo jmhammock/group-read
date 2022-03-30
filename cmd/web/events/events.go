@@ -33,11 +33,20 @@ func (pd PageDirection) String() string {
 	return s
 }
 
-func NewPageEvent(pd PageDirection) *Event {
+func NewTurnPageEvent(pd PageDirection) *Event {
 	return &Event{
 		Type: "turnPage",
 		Data: map[string]interface{}{
 			"direction": pd.String(),
+		},
+	}
+}
+
+func NewToPageEvent(p int) *Event {
+	return &Event{
+		Type: "toPage",
+		Data: map[string]interface{}{
+			"pageNumber": p,
 		},
 	}
 }

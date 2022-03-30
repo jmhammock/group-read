@@ -1,46 +1,34 @@
 package main
 
 import (
-	"fmt"
+	"database/sql"
 	"log"
 	"net/http"
 
-	"github.com/gorilla/websocket"
+	"github.com/jmhammock/ereader/cmd/web/application"
+	"github.com/jmhammock/ereader/cmd/web/book"
+	"github.com/jmhammock/ereader/cmd/web/handlers"
+	"github.com/jmhammock/ereader/cmd/web/room"
+	"github.com/jmhammock/ereader/cmd/web/user"
+	"github.com/julienschmidt/httprouter"
+	_ "github.com/mattn/go-sqlite3"
 )
 
-var upgrader = websocket.Upgrader{
-	ReadBufferSize:  1024,
-	WriteBufferSize: 1024,
-}
-
-func socketHandler(w http.ResponseWriter, r *http.Request) {
-	conn, err := upgrader.Upgrade(w, r, nil)
-	if err != nil {
-		log.Print(err)
-		return
-	}
-	defer conn.Close()
-
-	for {
-		msgType, msg, err := conn.ReadMessage()
-		if err != nil {
-			break
-		}
-
-		fmt.Printf("%s sent: %s\n", conn.RemoteAddr(), string(msg))
-
-		if err = conn.WriteMessage(msgType, msg); err != nil {
-			break
-		}
-	}
-}
-
 func main() {
-	http.HandleFunc("/ws", socketHandler)
+	db, err := sql.Open("sqlite3", "ereader")
+	if err != nil {
+		log.Fatal(err)
+	}
 
-	http.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		http.ServeFile(w, r, "index.html")
-	})
+	app := &application.Application{
+		BookRepository: book.NewRepository(db),
+		RoomRepository: room.NewRepository(db),
+		UserRepository: user.NewRepository(db),
+	}
+
+	r := httprouter.New()
+	r.GET("/ws", handlers.SocketHandler(app))
+	r.GET("/", handlers.Home)
 
 	log.Fatal(http.ListenAndServe(":8080", nil))
 }
