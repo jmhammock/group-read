@@ -3,11 +3,11 @@ package handlers
 import (
 	"log"
 	"net/http"
-	"sync"
 
 	"github.com/gorilla/websocket"
 	"github.com/jmhammock/ereader/cmd/web/application"
 	"github.com/jmhammock/ereader/cmd/web/events"
+	"github.com/jmhammock/ereader/cmd/web/room"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -16,60 +16,61 @@ var upgrader = websocket.Upgrader{
 	WriteBufferSize: 1024,
 }
 
-type currentPage struct {
-	sync.Mutex
-	pageNumber int
-}
-
-func (c *currentPage) setPage(p int) {
-	c.Lock()
-	defer c.Unlock()
-	c.pageNumber = p
-}
-
-func (c *currentPage) getPage() int {
-	c.Lock()
-	defer c.Unlock()
-	return c.pageNumber
-}
-
 func SocketHandler(app *application.Application) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
+		roomId := p.ByName("id")
+		if _, ok := app.Rooms[roomId]; !ok {
+			app.Rooms[roomId] = room.NewRoom(roomId)
+		}
+		readingRoom := app.Rooms[roomId]
+		readingRoom.Broadcaster()
+		log.Printf("number of rooms: %d", len(app.Rooms))
+
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
 			log.Println(err)
 			return
 		}
-		defer conn.Close()
 
-		cp := currentPage{
-			pageNumber: 0,
-		}
+		client := room.NewClient(conn)
+		readingRoom.Mutex.Lock()
+		readingRoom.Members[client.Id] = client
+		readingRoom.Mutex.Unlock()
+
+		defer func() {
+			delete(readingRoom.Members, client.Id)
+			conn.Close()
+			leaveEvent := events.Event{
+				Type:     "client.leave",
+				SenderId: client.Id,
+				Data: map[string]interface{}{
+					"client": client.Id,
+				},
+			}
+			readingRoom.BroadcastChan <- leaveEvent
+			if len(readingRoom.Members) == 0 {
+				close(readingRoom.BroadcastChan)
+				delete(app.Rooms, readingRoom.Id)
+			}
+			log.Printf("number of rooms: %d", len(app.Rooms))
+		}()
+
+		log.Printf(
+			"number of %s clients: %d",
+			roomId,
+			len(app.Rooms[roomId].Members),
+		)
+
 		for {
-			var event *events.Event
-			err := conn.ReadJSON(event)
+			var event events.Event
+			err := client.Conn.ReadJSON(&event)
 			if err != nil {
+				log.Print("error")
 				log.Print(err)
 				break
 			}
 
-			switch event.Type {
-			case "toPage":
-				pn, ok := event.Data["pageNumber"].(int)
-				if !ok {
-					log.Println("page number must be an integer")
-					break
-				}
-				cp.setPage(pn)
-				conn.WriteJSON(event)
-			case "join":
-				err := conn.WriteJSON(events.NewToPageEvent(cp.getPage()))
-				if err != nil {
-					log.Println(err)
-				}
-			default:
-				conn.WriteJSON(event)
-			}
+			readingRoom.BroadcastChan <- event
 		}
 	}
 }

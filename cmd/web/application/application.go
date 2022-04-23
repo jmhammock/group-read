@@ -10,4 +10,5 @@ type Application struct {
 	BookRepository *book.BookRepository
 	RoomRepository *room.RoomRepository
 	UserRepository *user.UserRepository
+	Rooms          map[string]*room.Room
 }

@@ -1,0 +1,20 @@
+{
+  "name": "reader_demo",
+  "version": "0.1.0",
+  "description": "ereader demo",
+  "main": "index.js",
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "build": "esbuild js/app.js --bundle --minify --sourcemap --target=chrome58 --outfile=public/app.min.js",
+    "build:dev": "esbuild js/app.js --bundle --target=chrome58 --outfile=public/app.min.js --watch"
+  },
+  "author": "Jason Hammock",
+  "license": "MIT",
+  "dependencies": {
+    "epubjs": "^0.3.93",
+    "jszip": "^3.8.0"
+  },
+  "devDependencies": {
+    "esbuild": "^0.14.36"
+  }
+}

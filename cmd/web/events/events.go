@@ -1,8 +1,9 @@
 package events
 
 type Event struct {
-	Type string                 `json:"type"`
-	Data map[string]interface{} `json:"data"`
+	Type     string                 `json:"type"`
+	SenderId string                 `json:"sender_id"`
+	Data     map[string]interface{} `json:"data"`
 }
 
 func NewHighlightEvent(cfiRange string) *Event {

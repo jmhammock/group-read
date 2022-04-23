@@ -2,6 +2,7 @@ package main
 
 import (
 	"database/sql"
+	"embed"
 	"log"
 	"net/http"
 
@@ -14,6 +15,12 @@ import (
 	_ "github.com/mattn/go-sqlite3"
 )
 
+//go:embed templates/*
+var templateFS embed.FS
+
+//go:embed public/*
+var publicFS embed.FS
+
 func main() {
 	db, err := sql.Open("sqlite3", "ereader")
 	if err != nil {
@@ -24,11 +31,14 @@ func main() {
 		BookRepository: book.NewRepository(db),
 		RoomRepository: room.NewRepository(db),
 		UserRepository: user.NewRepository(db),
+		Rooms:          make(map[string]*room.Room),
 	}
 
 	r := httprouter.New()
-	r.GET("/ws", handlers.SocketHandler(app))
-	r.GET("/", handlers.Home)
 
-	log.Fatal(http.ListenAndServe(":8080", nil))
+	r.GET("/public/*filepath", handlers.Public(publicFS))
+	r.GET("/room/:id", handlers.Room(templateFS, app))
+	r.GET("/ws/:id", handlers.SocketHandler(app))
+
+	log.Fatal(http.ListenAndServe(":8080", r))
 }

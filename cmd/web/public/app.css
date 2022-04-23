@@ -1,0 +1,10 @@
+.viewer-grid {
+    display: grid;
+    grid-template-columns: 50px calc(100vw - 258px) 50px;
+    grid-auto-rows: auto;
+}
+
+.viewer-grid .control {
+    display: flex;
+    align-items: center;
+}
