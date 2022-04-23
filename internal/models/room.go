@@ -8,7 +8,13 @@ type Room struct {
 type Rooms []Room
 
 type RoomModel struct {
-	DB
+	db DB
+}
+
+func NewRoomModel(db DB) *RoomModel {
+	return &RoomModel{
+		db: db,
+	}
 }
 
 func (r RoomModel) Get(limit, offset uint32) (*Rooms, error) {
@@ -17,7 +23,7 @@ func (r RoomModel) Get(limit, offset uint32) (*Rooms, error) {
 		LIMIT $1
 		OFFSET $2;`
 
-	rows, err := r.DB.Query(q, limit, offset)
+	rows, err := r.db.Query(q, limit, offset)
 	if err != nil {
 		return nil, err
 	}
@@ -46,7 +52,7 @@ func (r RoomModel) GetById(id string) (*Room, error) {
 		WHERE r.id = $1;`
 
 	var room *Room
-	err := r.DB.QueryRow(q, id).Scan(&room)
+	err := r.db.QueryRow(q, id).Scan(&room)
 	if err != nil {
 		return nil, err
 	}
@@ -59,7 +65,7 @@ func (r RoomModel) Insert(name string) (*Room, error) {
 		RETURNING id, name;`
 
 	var room *Room
-	err := r.DB.QueryRow(q, name).Scan(&room)
+	err := r.db.QueryRow(q, name).Scan(&room)
 	if err != nil {
 		return nil, err
 	}
@@ -72,7 +78,7 @@ func (r RoomModel) Update(room *Room) error {
 		SET name = $1
 		WHERE id = $2;`
 
-	_, err := r.DB.Execute(q, room.Name, room.Id)
+	_, err := r.db.Execute(q, room.Name, room.Id)
 	return err
 }
 
@@ -80,6 +86,6 @@ func (r RoomModel) Delete(id string) error {
 	q := `DELETE FROM rooms
 		WHERE id = $1;`
 
-	_, err := r.DB.Execute(q, id)
+	_, err := r.db.Execute(q, id)
 	return err
 }
