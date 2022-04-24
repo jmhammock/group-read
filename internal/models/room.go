@@ -39,7 +39,7 @@ func (r RoomModel) Get(limit, offset uint32) (*Rooms, error) {
 		rooms = append(rooms, room)
 	}
 
-	if rows.Err() != nil {
+	if err = rows.Err(); err != nil {
 		return nil, err
 	}
 
@@ -53,24 +53,18 @@ func (r RoomModel) GetById(id string) (*Room, error) {
 
 	var room *Room
 	err := r.db.QueryRow(q, id).Scan(&room)
-	if err != nil {
-		return nil, err
-	}
 
-	return room, nil
+	return room, err
 }
 
-func (r RoomModel) Insert(name string) (*Room, error) {
+func (r RoomModel) Insert(name string) (string, error) {
 	q := `INSERT INTO rooms (name) VALUES($1)
-		RETURNING id, name;`
+		RETURNING id;`
 
-	var room *Room
-	err := r.db.QueryRow(q, name).Scan(&room)
-	if err != nil {
-		return nil, err
-	}
+	var id string
+	err := r.db.QueryRow(q, name).Scan(&id)
 
-	return room, nil
+	return id, err
 }
 
 func (r RoomModel) Update(room *Room) error {

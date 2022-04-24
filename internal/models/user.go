@@ -8,7 +8,7 @@ type User struct {
 	LastName   string `json:"last_name"`
 	Email      string `json:"email"`
 	Password   string `json:"-"`
-	UserTypeId string `json:"user_type_id"`
+	UserRoleId string `json:"user_role_id"`
 }
 
 type Users []User
@@ -33,6 +33,7 @@ func (u UserModel) Get(limit, offset uint32) (*Users, error) {
 	if err != nil {
 		return nil, err
 	}
+	defer rows.Close()
 
 	var users Users
 	for rows.Next() {
@@ -43,7 +44,8 @@ func (u UserModel) Get(limit, offset uint32) (*Users, error) {
 		}
 		users = append(users, user)
 	}
-	if err := rows.Err(); err != nil {
+
+	if err = rows.Err(); err != nil {
 		return nil, err
 	}
 
@@ -57,11 +59,8 @@ func (u UserModel) GetById(id string) (*User, error) {
 
 	var user *User
 	err := u.db.QueryRow(q, id).Scan(&user)
-	if err != nil {
-		return nil, err
-	}
 
-	return user, nil
+	return user, err
 }
 
 func (u UserModel) Insert(user *User) (string, error) {
@@ -80,14 +79,11 @@ func (u UserModel) Insert(user *User) (string, error) {
 		user.LastName,
 		user.Email,
 		string(password),
-		user.UserTypeId,
+		user.UserRoleId,
 	}
 	err = u.db.QueryRow(q, args...).Scan(&id)
-	if err != nil {
-		return "", err
-	}
 
-	return id, nil
+	return id, err
 }
 
 func (u UserModel) Update(user *User) error {
@@ -103,7 +99,7 @@ func (u UserModel) Update(user *User) error {
 		user.FirstName,
 		user.LastName,
 		user.Email,
-		user.UserTypeId,
+		user.UserRoleId,
 	}
 	_, err := u.db.Execute(q, args...)
 	return err
@@ -131,7 +127,55 @@ func (u UserModel) Delete(id string) error {
 	return err
 }
 
-type UserType struct {
+type UserRole struct {
 	Id   string `json:"id"`
 	Name string `json:"name"`
+}
+
+type UserRoles []UserRole
+
+type UserRoleModel struct {
+	db DB
+}
+
+func NewUserRoleModel(db DB) *UserRoleModel {
+	return &UserRoleModel{
+		db: db,
+	}
+}
+
+func (u UserRoleModel) Get() (*UserRoles, error) {
+	q := `SELECT * FROM user_types;`
+
+	rows, err := u.db.Query(q)
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var userRoles UserRoles
+	for rows.Next() {
+		var userRole UserRole
+		err := rows.Scan(&userRole)
+		if err != nil {
+			return nil, err
+		}
+		userRoles = append(userRoles, userRole)
+	}
+
+	if err = rows.Err(); err != nil {
+		return nil, err
+	}
+
+	return &userRoles, nil
+}
+
+func (u UserRoleModel) Insert(name string) (string, error) {
+	q := `INSERT INTO user_roles (name) VALUES($1)
+		RETURNING id;`
+
+	var id string
+	err := u.db.QueryRow(q, name).Scan(&id)
+
+	return id, err
 }
