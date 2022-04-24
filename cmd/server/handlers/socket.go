@@ -7,7 +7,7 @@ import (
 	"github.com/gorilla/websocket"
 	"github.com/jmhammock/ereader/cmd/server/application"
 	"github.com/jmhammock/ereader/cmd/server/events"
-	"github.com/jmhammock/ereader/cmd/server/room"
+	"github.com/jmhammock/ereader/cmd/server/wsroom"
 	"github.com/julienschmidt/httprouter"
 )
 
@@ -20,7 +20,7 @@ func SocketHandler(app *application.Application) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		roomId := p.ByName("id")
 		if _, ok := app.WSRooms[roomId]; !ok {
-			app.WSRooms[roomId] = room.NewRoom(roomId)
+			app.WSRooms[roomId] = wsroom.NewWSRoom(roomId)
 		}
 		readingRoom := app.WSRooms[roomId]
 		readingRoom.Broadcaster()
@@ -32,7 +32,7 @@ func SocketHandler(app *application.Application) httprouter.Handle {
 			return
 		}
 
-		client := room.NewClient(conn)
+		client := wsroom.NewClient(conn)
 		readingRoom.Mutex.Lock()
 		readingRoom.Members[client.Id] = client
 		readingRoom.Mutex.Unlock()
