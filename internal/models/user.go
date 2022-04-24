@@ -14,10 +14,10 @@ type User struct {
 type Users []User
 
 type UserModel struct {
-	db DB
+	db *DB
 }
 
-func NewUserModel(db DB) *UserModel {
+func NewUserModel(db *DB) *UserModel {
 	return &UserModel{
 		db: db,
 	}
@@ -135,10 +135,10 @@ type UserRole struct {
 type UserRoles []UserRole
 
 type UserRoleModel struct {
-	db DB
+	db *DB
 }
 
-func NewUserRoleModel(db DB) *UserRoleModel {
+func NewUserRoleModel(db *DB) *UserRoleModel {
 	return &UserRoleModel{
 		db: db,
 	}

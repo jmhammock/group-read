@@ -8,10 +8,10 @@ type Family struct {
 type Families []Family
 
 type FamilyModel struct {
-	db DB
+	db *DB
 }
 
-func NewFamilyModel(db DB) *FamilyModel {
+func NewFamilyModel(db *DB) *FamilyModel {
 	return &FamilyModel{
 		db: db,
 	}

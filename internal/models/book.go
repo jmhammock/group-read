@@ -10,10 +10,10 @@ type Book struct {
 type Books []Book
 
 type BookModel struct {
-	db DB
+	db *DB
 }
 
-func NewBookModel(db DB) *BookModel {
+func NewBookModel(db *DB) *BookModel {
 	return &BookModel{
 		db: db,
 	}

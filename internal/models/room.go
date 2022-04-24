@@ -8,10 +8,10 @@ type Room struct {
 type Rooms []Room
 
 type RoomModel struct {
-	db DB
+	db *DB
 }
 
-func NewRoomModel(db DB) *RoomModel {
+func NewRoomModel(db *DB) *RoomModel {
 	return &RoomModel{
 		db: db,
 	}
