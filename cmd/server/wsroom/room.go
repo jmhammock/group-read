@@ -1,6 +1,7 @@
 package wsroom
 
 import (
+	"errors"
 	"fmt"
 	"sync"
 
@@ -9,20 +10,55 @@ import (
 	"github.com/jmhammock/ereader/cmd/server/events"
 )
 
+var (
+	ErrMemberAlreadyExists = errors.New("member already exists")
+)
+
 type WSRoom struct {
-	Id            string `json:"id"`
+	Id            string
 	Members       map[string]*Client
 	BroadcastChan chan events.Event
-	*sync.Mutex
+	mu            *sync.Mutex
 }
+
+type WSRooms []WSRoom
 
 func NewWSRoom(id string) *WSRoom {
 	return &WSRoom{
 		Id:            id,
 		Members:       make(map[string]*Client),
 		BroadcastChan: make(chan events.Event),
-		Mutex:         &sync.Mutex{},
 	}
+}
+
+func (r *WSRoom) AddMember(c *Client) error {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	if _, exists := r.Members[c.Id]; exists == true {
+		return ErrMemberAlreadyExists
+	}
+	r.Members[c.Id] = c
+	return nil
+}
+
+func (r *WSRoom) RemoveMember(id string) {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	delete(r.Members, id)
+}
+
+func (r *WSRoom) MembersLen() int {
+	r.mu.Lock()
+	defer r.mu.Unlock()
+	return len(r.Members)
+}
+
+func (r *WSRoom) Close(e events.Event) {
+	r.BroadcastChan <- e
+	close(r.BroadcastChan)
+	r.mu.Lock()
+	r.Members = make(map[string]*Client)
+	r.mu.Unlock()
 }
 
 func (r *WSRoom) Broadcaster() {

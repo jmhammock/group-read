@@ -19,12 +19,8 @@ var upgrader = websocket.Upgrader{
 func SocketHandler(app *application.Application) httprouter.Handle {
 	return func(w http.ResponseWriter, r *http.Request, p httprouter.Params) {
 		roomId := p.ByName("id")
-		if _, ok := app.WSRooms[roomId]; !ok {
-			app.WSRooms[roomId] = wsroom.NewWSRoom(roomId)
-		}
-		readingRoom := app.WSRooms[roomId]
-		readingRoom.Broadcaster()
-		log.Printf("number of rooms: %d", len(app.WSRooms))
+		wsr := wsroom.NewWSRoom(roomId)
+		app.WSRooms.AddRoom(wsr)
 
 		conn, err := upgrader.Upgrade(w, r, nil)
 		if err != nil {
@@ -33,12 +29,13 @@ func SocketHandler(app *application.Application) httprouter.Handle {
 		}
 
 		client := wsroom.NewClient(conn)
-		readingRoom.Mutex.Lock()
-		readingRoom.Members[client.Id] = client
-		readingRoom.Mutex.Unlock()
+		err = wsr.AddMember(client)
+		if err != nil {
+			return
+		}
 
 		defer func() {
-			delete(readingRoom.Members, client.Id)
+			wsr.RemoveMember(client.Id)
 			conn.Close()
 			leaveEvent := events.Event{
 				Type:     "client.leave",
@@ -47,18 +44,24 @@ func SocketHandler(app *application.Application) httprouter.Handle {
 					"client": client.Id,
 				},
 			}
-			readingRoom.BroadcastChan <- leaveEvent
-			if len(readingRoom.Members) == 0 {
-				close(readingRoom.BroadcastChan)
-				delete(app.WSRooms, readingRoom.Id)
+			wsr.BroadcastChan <- leaveEvent
+			if wsr.MembersLen() == 0 {
+				closeRoomEvent := events.Event{
+					Type:     "room.close",
+					SenderId: client.Id,
+					Data: map[string]interface{}{
+						"room": wsr.Id,
+					},
+				}
+				app.WSRooms.RemoveRoom(wsr.Id, closeRoomEvent)
 			}
-			log.Printf("number of rooms: %d", len(app.WSRooms))
+			log.Printf("number of rooms: %d", app.WSRooms.RoomsLen())
 		}()
 
 		log.Printf(
 			"number of %s clients: %d",
 			roomId,
-			len(app.WSRooms[roomId].Members),
+			wsr.MembersLen(),
 		)
 
 		for {
@@ -70,7 +73,7 @@ func SocketHandler(app *application.Application) httprouter.Handle {
 				break
 			}
 
-			readingRoom.BroadcastChan <- event
+			wsr.BroadcastChan <- event
 		}
 	}
 }

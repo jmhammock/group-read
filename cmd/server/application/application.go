@@ -11,5 +11,5 @@ type Application struct {
 	UserRoleModel *models.UserRoleModel
 	RoomModel     *models.RoomModel
 	BookModel     *models.BookModel
-	WSRooms       map[string]*wsroom.WSRoom
+	WSRooms       *wsroom.WSRoomManager
 }

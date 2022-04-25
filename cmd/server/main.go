@@ -27,7 +27,7 @@ func main() {
 		UserRoleModel: models.NewUserRoleModel(wdb),
 		BookModel:     models.NewBookModel(wdb),
 		RoomModel:     models.NewRoomModel(wdb),
-		WSRooms:       make(map[string]*wsroom.WSRoom),
+		WSRooms:       wsroom.NewWSRoomManager(),
 	}
 
 	r := httprouter.New()
