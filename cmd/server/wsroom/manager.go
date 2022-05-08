@@ -3,8 +3,6 @@ package wsroom
 import (
 	"errors"
 	"sync"
-
-	"github.com/jmhammock/ereader/cmd/server/events"
 )
 
 var (
@@ -19,6 +17,7 @@ type WSRoomManager struct {
 func NewWSRoomManager() *WSRoomManager {
 	return &WSRoomManager{
 		WSRooms: make(map[string]*WSRoom),
+		mu:      &sync.Mutex{},
 	}
 }
 
@@ -39,15 +38,15 @@ func (w *WSRoomManager) AddRoom(wr *WSRoom) {
 	}
 	w.WSRooms[wr.Id] = wr
 	w.mu.Unlock()
-	wr.Broadcaster()
+	wr.Receiver()
 }
 
-func (w *WSRoomManager) RemoveRoom(id string, e events.Event) {
+func (w *WSRoomManager) RemoveRoom(roomId, clientId string) {
 	w.mu.Lock()
 	defer w.mu.Unlock()
-	if room, exists := w.WSRooms[id]; exists == true {
-		room.Close(e)
-		delete(w.WSRooms, id)
+	if room, exists := w.WSRooms[roomId]; exists == true {
+		room.Close(clientId)
+		delete(w.WSRooms, roomId)
 	}
 }
 

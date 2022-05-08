@@ -28,32 +28,16 @@ func SocketHandler(app *application.Application) httprouter.Handle {
 			return
 		}
 
-		client := wsroom.NewClient(conn)
-		err = wsr.AddMember(client)
+		member := wsroom.NewMember(conn)
+		err = wsr.Join(member)
 		if err != nil {
 			return
 		}
 
 		defer func() {
-			wsr.RemoveMember(client.Id)
-			conn.Close()
-			leaveEvent := events.Event{
-				Type:     "client.leave",
-				SenderId: client.Id,
-				Data: map[string]interface{}{
-					"client": client.Id,
-				},
-			}
-			wsr.BroadcastChan <- leaveEvent
+			wsr.Leave(member.GetId())
 			if wsr.MembersLen() == 0 {
-				closeRoomEvent := events.Event{
-					Type:     "room.close",
-					SenderId: client.Id,
-					Data: map[string]interface{}{
-						"room": wsr.Id,
-					},
-				}
-				app.WSRooms.RemoveRoom(wsr.Id, closeRoomEvent)
+				app.WSRooms.RemoveRoom(wsr.Id, member.GetId())
 			}
 			log.Printf("number of rooms: %d", app.WSRooms.RoomsLen())
 		}()
@@ -65,15 +49,14 @@ func SocketHandler(app *application.Application) httprouter.Handle {
 		)
 
 		for {
-			var event events.Event
-			err := client.Conn.ReadJSON(&event)
+			var event *events.Event
+			err := member.Read(event)
 			if err != nil {
 				log.Print("error")
 				log.Print(err)
 				break
 			}
-
-			wsr.BroadcastChan <- event
+			wsr.Broadcast(event)
 		}
 	}
 }

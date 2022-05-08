@@ -5,46 +5,51 @@ import (
 	"fmt"
 	"sync"
 
-	"github.com/google/uuid"
-	"github.com/gorilla/websocket"
 	"github.com/jmhammock/ereader/cmd/server/events"
 )
 
 var (
 	ErrMemberAlreadyExists = errors.New("member already exists")
+	ErrMemberDoesNotExist  = errors.New("member does not exist")
 )
 
 type WSRoom struct {
-	Id            string
-	Members       map[string]*Client
-	BroadcastChan chan events.Event
-	mu            *sync.Mutex
+	Id          string
+	Members     map[string]Client
+	messageChan chan *events.Event
+	mu          *sync.Mutex
 }
 
 type WSRooms []WSRoom
 
 func NewWSRoom(id string) *WSRoom {
 	return &WSRoom{
-		Id:            id,
-		Members:       make(map[string]*Client),
-		BroadcastChan: make(chan events.Event),
+		Id:          id,
+		Members:     make(map[string]Client),
+		messageChan: make(chan *events.Event),
+		mu:          &sync.Mutex{},
 	}
 }
 
-func (r *WSRoom) AddMember(c *Client) error {
+func (r *WSRoom) Join(c Client) error {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-	if _, exists := r.Members[c.Id]; exists == true {
+	if _, exists := r.Members[c.GetId()]; exists == true {
 		return ErrMemberAlreadyExists
 	}
-	r.Members[c.Id] = c
+	r.Members[c.GetId()] = c
+	r.mu.Unlock()
+	r.messageChan <- events.NewJoinEvent(c.GetId())
 	return nil
 }
 
-func (r *WSRoom) RemoveMember(id string) {
+func (r *WSRoom) Leave(id string) {
 	r.mu.Lock()
-	defer r.mu.Unlock()
-	delete(r.Members, id)
+	if m, exists := r.Members[id]; exists == true {
+		m.Close()
+		delete(r.Members, id)
+	}
+	r.mu.Unlock()
+	r.messageChan <- events.NewLeaveEvent(id)
 }
 
 func (r *WSRoom) MembersLen() int {
@@ -53,42 +58,36 @@ func (r *WSRoom) MembersLen() int {
 	return len(r.Members)
 }
 
-func (r *WSRoom) Close(e events.Event) {
-	r.BroadcastChan <- e
-	close(r.BroadcastChan)
+func (r *WSRoom) Close(id string) {
+	r.messageChan <- events.NewWSRoomCloseEvent(id)
+	close(r.messageChan)
 	r.mu.Lock()
-	r.Members = make(map[string]*Client)
+	for _, c := range r.Members {
+		c.Close()
+	}
+	r.Members = make(map[string]Client)
 	r.mu.Unlock()
 }
 
-func (r *WSRoom) Broadcaster() {
+func (r *WSRoom) Broadcast(e *events.Event) {
+	r.messageChan <- e
+}
+
+func (r *WSRoom) Receiver() {
 	var wg sync.WaitGroup
 
 	wg.Add(1)
 	go func() {
-		for event := range r.BroadcastChan {
-			fmt.Println(event)
+		defer wg.Done()
+		for e := range r.messageChan {
 			for id, client := range r.Members {
-				if event.SenderId != id {
-					err := client.Conn.WriteJSON(event)
+				if e.SenderId != id {
+					err := client.Send(e)
 					if err != nil {
 						fmt.Println(err)
 					}
 				}
 			}
 		}
-		wg.Done()
 	}()
-}
-
-type Client struct {
-	Id   string
-	Conn *websocket.Conn
-}
-
-func NewClient(conn *websocket.Conn) *Client {
-	return &Client{
-		Id:   uuid.NewString(),
-		Conn: conn,
-	}
 }
